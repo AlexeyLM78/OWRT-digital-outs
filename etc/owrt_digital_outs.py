@@ -2,7 +2,7 @@
 
 import sys
 from owrt_snmp_protocol import snmp_protocol
-from threading import Thread
+from threading import Thread, Lock
 
 try:
     import ubus
@@ -12,7 +12,7 @@ except ImportError:
 
 curr_relays = {}
 snmp_pr = snmp_protocol()
-
+lock_curr_relays = Lock()
 
 def ubus_init():
     ubus.add(
@@ -67,6 +67,36 @@ def run_poll_relay(config_relay):
     config_relay['id_task'] = id_poll
 
 
+def poll_state_changed(relay):
+    lock_curr_relays.acquire()
+    config_relay = curr_relays.get(relay)
+    if config_relay is None:
+        # relay delete
+        lock_curr_relays.release()
+        return
+
+    try:
+        id_poll = config_relay['id_task']
+        old_state = config_relay['state']
+        id_relay = config_relay['id_relay']
+    except KeyError:
+        lock_curr_relays.release()
+        return
+
+    state, status = snmp_pr.get_snmp_poll(id_poll)
+    if status == "0":
+        if state != old_state:
+            try:
+                config_relay['state'] = state
+            except KeyError:
+                lock_curr_relays.release()
+                return
+            else:
+                ubus.send("signal", {"event": "statechanged", "id": id_relay, "state": state})
+
+    lock_curr_relays.release()
+
+
 if __name__ == '__main__':
     if not ubus.connect("/var/run/ubus.sock"):
         sys.stderr.write('Failed connect to ubus\n')
@@ -88,6 +118,12 @@ if __name__ == '__main__':
     try:
         while True:
             ubus.loop(1)
+            lock_curr_relays.acquire()
+            relays = list(curr_relays.keys())
+            lock_curr_relays.release()
+            for relay in relays:
+                poll_state_changed(relay)
+                ubus.loop(1)
     except KeyboardInterrupt:
         print("__main__ === KeyboardInterrupt")
         for relay, config in curr_relays.items():
