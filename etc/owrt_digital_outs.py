@@ -86,8 +86,6 @@ def reparseconfig(event, data):
             if protodict['.type'] == "relay":
                 if protodict['.name'] != "relay_prototype_snmp":
                     if protodict['proto'] == "SNMP":
-                        if not check_param_relay(protodict):
-                            continue
 
                         lock_curr_relays.acquire()
                         config = curr_relays.get(protodict['id_relay'])
@@ -103,9 +101,12 @@ def reparseconfig(event, data):
                             if diff_param_poll_snmp(config, protodict):
                                 snmp_pr.stop_snmp_poll(config['id_task'])
                                 del curr_relays[config['id_relay']]
-                                protodict['status'] = '-1'
-                                protodict['state'] = '-1'
-                                curr_relays[protodict['id_relay']] = protodict
+
+                                if check_param_relay(protodict):
+                                    protodict['status'] = '-1'
+                                    protodict['state'] = '-1'
+                                    curr_relays[protodict['id_relay']] = protodict
+
                                 lock_curr_relays.release()
 
                             else:
