@@ -10,6 +10,7 @@ except ImportError:
     logger.error('Failed import ubus.')
     sys.exit(-1)
 
+fl_run_main = True
 curr_relays = {}
 snmp_pr = snmp_protocol()
 uci_config_snmp = "owrt_digital_outs"
@@ -55,6 +56,92 @@ def parseconfig():
                     confdict['state'] = '-1'
                     lock_curr_relays.acquire()
                     curr_relays[confdict['id_relay']] = confdict
+                    lock_curr_relays.release()
+
+
+def diff_param_poll_snmp(config, protodict):
+    try:
+        if config['address'] == protodict['address'] and config['community'] == protodict['community'] and \
+            config['oid'] == protodict['oid'] and config['port'] == protodict['port'] and \
+            config['timeout'] == protodict['timeout'] and config['period'] == protodict['period']:
+            return False
+        else:
+            return True
+    except KeyError:
+        return False
+
+
+def reparseconfig(event, data):
+    global fl_run_main
+    if data['config'] == uci_config_snmp:
+        try:
+            conf_proto = ubus.call("uci", "get", {"config": uci_config_snmp})
+        except RuntimeError:
+            print("RuntimeError: uci get {0}".format(uci_config_snmp))
+            fl_run_main = False
+            return
+
+        # Add & edit relay
+        for protodict in list(conf_proto[0]['values'].values()):
+            if protodict['.type'] == "relay":
+                if protodict['.name'] != "relay_prototype_snmp":
+                    if protodict['proto'] == "SNMP":
+                        if not check_param_relay(protodict):
+                            continue
+
+                        lock_curr_relays.acquire()
+                        config = curr_relays.get(protodict['id_relay'])
+                        if config is None:
+                            # Add new relay
+                            protodict['status'] = '-1'
+                            protodict['state'] = '-1'
+                            curr_relays[protodict['id_relay']] = protodict
+                            lock_curr_relays.release()
+
+                        else:
+                            # Edit relay
+                            if diff_param_poll_snmp(config, protodict):
+                                snmp_pr.stop_snmp_poll(config['id_task'])
+                                del curr_relays[config['id_relay']]
+                                protodict['status'] = '-1'
+                                protodict['state'] = '-1'
+                                curr_relays[protodict['id_relay']] = protodict
+                                lock_curr_relays.release()
+
+                            else:
+                                lock_curr_relays.release()
+                                continue
+
+                        # Run polling thread on SNMP
+                        thrd = Thread(target=run_poll_relay, args=(protodict['id_relay'], ))
+                        thrd.start()
+
+        # Deleting relay
+        lock_curr_relays.acquire()
+        relays = list(curr_relays.keys())
+        lock_curr_relays.release()
+        for relay in relays:
+            relay_exists = False
+            for protodict in list(conf_proto[0]['values'].values()):
+                if protodict['.type'] == "relay":
+                    if protodict['.name'] != "relay_prototype_snmp":
+                        if protodict['proto'] == "SNMP":
+                            try:
+                                if protodict['id_relay'] == relay:
+                                    relay_exists = True
+                                    break
+                            except KeyError:
+                                pass
+
+            if relay_exists == False:
+                lock_curr_relays.acquire()
+                try:
+                    config = curr_relays.pop(relay)
+                    snmp_pr.stop_snmp_poll(config['id_task'])
+                except KeyError:
+                    lock_curr_relays.release()
+                    continue
+                else:
                     lock_curr_relays.release()
 
 
@@ -131,8 +218,10 @@ if __name__ == '__main__':
         th = Thread(target=run_poll_relay, args=(relay, ))
         th.start()
 
+    ubus.listen(("commit", reparseconfig))
+
     try:
-        while True:
+        while fl_run_main:
             ubus.loop(1)
             lock_curr_relays.acquire()
             relays = list(curr_relays.keys())
