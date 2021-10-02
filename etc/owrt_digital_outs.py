@@ -58,18 +58,32 @@ def parseconfig():
                     lock_curr_relays.release()
 
 
-def run_poll_relay(config_relay):
-    if config_relay['start_state'] != 'NO':
-        id_set = snmp_pr.set_snmp_value(config_relay['address'], config_relay['community'], config_relay['oid'],
-                                        config_relay['port'], config_relay['timeout'], config_relay['start_state'])
-        res_set = "-1"
-        while res_set == "-1":
-            res_set = snmp_pr.res_set_snmp_value(id_set)
-        # TODO: handling error set_snmp_value()
+def run_poll_relay(relay):
+    lock_curr_relays.acquire()
+    config_relay = curr_relays.get(relay)
+    if config_relay is None:
+        # relay delete
+        lock_curr_relays.release()
+        return
+
+    if not check_param_relay(config_relay):
+        del curr_relays[relay]
+        lock_curr_relays.release()
+        return
 
     id_poll = snmp_pr.start_snmp_poll(config_relay['address'], config_relay['community'], config_relay['oid'],
                                       config_relay['port'], config_relay['timeout'], config_relay['period'])
     config_relay['id_task'] = id_poll
+    tmp_cnfg_relay = config_relay.copy()
+    lock_curr_relays.release()
+
+    if tmp_cnfg_relay['start_state'] != 'NO':
+        id_set = snmp_pr.set_snmp_value(tmp_cnfg_relay['address'], tmp_cnfg_relay['community'], tmp_cnfg_relay['oid'],
+                                        tmp_cnfg_relay['port'], tmp_cnfg_relay['timeout'], tmp_cnfg_relay['start_state'])
+        res_set = "-1"
+        while res_set == "-1":
+            res_set = snmp_pr.res_set_snmp_value(id_set)
+        # TODO: handling error set_snmp_value()
 
 
 def poll_state_changed(relay):
@@ -110,14 +124,11 @@ if __name__ == '__main__':
     ubus_init()
     parseconfig()
 
+    lock_curr_relays.acquire()
     relays = list(curr_relays.keys())
+    lock_curr_relays.release()
     for relay in relays:
-        config = curr_relays.get(relay)
-        if not check_param_relay(config):
-            del curr_relays[relay]
-            continue
-
-        th = Thread(target=run_poll_relay, args=(config, ))
+        th = Thread(target=run_poll_relay, args=(relay, ))
         th.start()
 
     try:
@@ -131,7 +142,15 @@ if __name__ == '__main__':
                 ubus.loop(1)
     except KeyboardInterrupt:
         print("__main__ === KeyboardInterrupt")
-        for relay, config in curr_relays.items():
-            snmp_pr.stop_snmp_poll(config['id_task'])
+    finally:
+        lock_curr_relays.acquire()
+        relays = list(curr_relays.keys())
+        for relay in relays:
+            try:
+                config = curr_relays.pop(relay)
+                snmp_pr.stop_snmp_poll(config['id_task'])
+            except KeyError:
+                continue
+        lock_curr_relays.release()
 
     ubus.disconnect()
