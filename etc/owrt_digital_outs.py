@@ -17,8 +17,31 @@ uci_config_snmp = "owrt_digital_outs"
 lock_curr_relays = Lock()
 
 def ubus_init():
+    def get_state_callback(event, data):
+        ret_val = {}
+        sect = data['id_relay']
+        lock_curr_relays.acquire()
+        try:
+            relay_dict = curr_relays[sect]
+        except KeyError:
+            # poll relay with id_relay not found
+            ret_val["state"] = '-1'
+            ret_val["status"] = '-2'
+        else:
+            ret_val["state"] = relay_dict['state']
+            ret_val["status"] = relay_dict['status']
+        finally:
+            lock_curr_relays.release()
+            event.reply(ret_val)
+
     ubus.add(
         'owrt_digital_outs', {
+            'get_state': {
+                'method': get_state_callback,
+                'signature': {
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                }
+            }
         }
     )
 
@@ -192,14 +215,15 @@ def poll_state_changed(relay):
 
     state, status = snmp_pr.get_snmp_poll(id_poll)
     if status == "0":
+        # Checking change state
         if state != old_state:
-            try:
-                config_relay['state'] = state
-            except KeyError:
-                lock_curr_relays.release()
-                return
-            else:
-                ubus.send("signal", {"event": "statechanged", "id": id_relay, "state": state})
+            ubus.send("signal", {"event": "statechanged", "id": id_relay, "state": state})
+
+    try:
+        config_relay['state'] = state
+        config_relay['status'] = status
+    except KeyError:
+        pass
 
     lock_curr_relays.release()
 
