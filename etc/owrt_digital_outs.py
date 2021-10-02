@@ -12,6 +12,7 @@ except ImportError:
 
 curr_relays = {}
 snmp_pr = snmp_protocol()
+uci_config_snmp = "owrt_digital_outs"
 lock_curr_relays = Lock()
 
 def ubus_init():
@@ -35,9 +36,11 @@ def check_param_relay(param):
 
 
 def parseconfig():
+    lock_curr_relays.acquire()
     curr_relays.clear()
+    lock_curr_relays.release()
     try:
-        confvalues = ubus.call("uci", "get", {"config": "owrt_digital_outs"})
+        confvalues = ubus.call("uci", "get", {"config": uci_config_snmp})
     except RuntimeError:
         sys.exit(-1)
 
@@ -50,7 +53,9 @@ def parseconfig():
 
                     confdict['status'] = '-1'
                     confdict['state'] = '-1'
+                    lock_curr_relays.acquire()
                     curr_relays[confdict['id_relay']] = confdict
+                    lock_curr_relays.release()
 
 
 def run_poll_relay(config_relay):
