@@ -34,10 +34,44 @@ def ubus_init():
             lock_curr_relays.release()
             event.reply(ret_val)
 
+    def set_val_snmp(config_relay, value):
+        id_set = snmp_pr.set_snmp_value(config_relay['address'], config_relay['community'], config_relay['oid'],
+                                        config_relay['port'], config_relay['timeout'], value)
+        res_set = "-1"
+        while res_set == "-1":
+            res_set = snmp_pr.res_set_snmp_value(id_set)
+
+        return res_set
+
+    def on_relay_callback(event, data):
+        ret_val = {}
+        sect = data['id_relay']
+        lock_curr_relays.acquire()
+        try:
+            relay_dict = curr_relays[sect]
+        except KeyError:
+            # poll relay with id_relay not found
+            ret_val["result"] = '-2'
+            lock_curr_relays.release()
+        else:
+            tmp_cnfg_relay = relay_dict.copy()
+            lock_curr_relays.release()
+
+            ret_val["result"] = set_val_snmp(tmp_cnfg_relay, '1')
+
+        finally:
+            event.reply(ret_val)
+
     ubus.add(
         'owrt_digital_outs', {
             'get_state': {
                 'method': get_state_callback,
+                'signature': {
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                }
+            },
+            'on_relay': {
+                'method': on_relay_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING
                 }
