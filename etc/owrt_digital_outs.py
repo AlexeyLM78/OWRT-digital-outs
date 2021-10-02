@@ -62,6 +62,25 @@ def ubus_init():
         finally:
             event.reply(ret_val)
 
+    def off_relay_callback(event, data):
+        ret_val = {}
+        sect = data['id_relay']
+        lock_curr_relays.acquire()
+        try:
+            relay_dict = curr_relays[sect]
+        except KeyError:
+            # poll relay with id_relay not found
+            ret_val["result"] = '-2'
+            lock_curr_relays.release()
+        else:
+            tmp_cnfg_relay = relay_dict.copy()
+            lock_curr_relays.release()
+
+            ret_val["result"] = set_val_snmp(tmp_cnfg_relay, '0')
+
+        finally:
+            event.reply(ret_val)
+
     ubus.add(
         'owrt_digital_outs', {
             'get_state': {
@@ -72,6 +91,12 @@ def ubus_init():
             },
             'on_relay': {
                 'method': on_relay_callback,
+                'signature': {
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                }
+            },
+            'off_relay': {
+                'method': off_relay_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING
                 }
