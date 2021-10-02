@@ -68,7 +68,7 @@ def diff_param_poll_snmp(config, protodict):
         else:
             return True
     except KeyError:
-        return False
+        return True
 
 
 def reparseconfig(event, data):
