@@ -316,7 +316,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("__main__ === KeyboardInterrupt")
     finally:
-        lock_curr_relays.acquire()
+        if not lock_curr_relays.locked():
+            lock_curr_relays.acquire()
         relays = list(curr_relays.keys())
         for relay in relays:
             try:
