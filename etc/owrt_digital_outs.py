@@ -81,6 +81,39 @@ def ubus_init():
         finally:
             event.reply(ret_val)
 
+    def switch_relay_callback(event, data):
+        ret_val = {}
+        sect = data['id_relay']
+        lock_curr_relays.acquire()
+        try:
+            relay_dict = curr_relays[sect]
+        except KeyError:
+            # poll relay with id_relay not found
+            ret_val["result"] = '-2'
+            lock_curr_relays.release()
+            event.reply(ret_val)
+
+        tmp_cnfg_relay = relay_dict.copy()
+        lock_curr_relays.release()
+
+        try:
+            cur_state = tmp_cnfg_relay['state']
+        except KeyError:
+            ret_val["result"] = '-1'
+            event.reply(ret_val)
+
+        if cur_state == '0':
+            val = '1'
+        elif cur_state == '1':
+            val = '0'
+        else:
+            ret_val["result"] = '-1'
+            event.reply(ret_val)
+
+        res_set = set_val_snmp(tmp_cnfg_relay, val)
+        ret_val["result"] = res_set
+        event.reply(ret_val)
+
     ubus.add(
         'owrt_digital_outs', {
             'get_state': {
@@ -97,6 +130,12 @@ def ubus_init():
             },
             'off_relay': {
                 'method': off_relay_callback,
+                'signature': {
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                }
+            },
+            'switch_relay': {
+                'method': switch_relay_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING
                 }
