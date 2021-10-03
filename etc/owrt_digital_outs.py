@@ -3,6 +3,7 @@
 import sys
 from owrt_snmp_protocol import snmp_protocol
 from threading import Thread, Lock
+import time
 
 try:
     import ubus
@@ -114,6 +115,31 @@ def ubus_init():
         ret_val["result"] = res_set
         event.reply(ret_val)
 
+    def impuls_on_relay_callback(event, data):
+        ret_val = {}
+        sect = data['id_relay']
+        pause = data['time']
+        lock_curr_relays.acquire()
+        try:
+            relay_dict = curr_relays[sect]
+        except KeyError:
+            # poll relay with id_relay not found
+            ret_val["result"] = '-2'
+            lock_curr_relays.release()
+        else:
+            tmp_cnfg_relay = relay_dict.copy()
+            lock_curr_relays.release()
+
+            res = set_val_snmp(tmp_cnfg_relay, '1')
+            if res == '0':
+                time.sleep(float(pause))
+                ret_val["result"] = set_val_snmp(tmp_cnfg_relay, '0')
+            else:
+                ret_val["result"] = res
+
+        finally:
+            event.reply(ret_val)
+
     ubus.add(
         'owrt_digital_outs', {
             'get_state': {
@@ -138,6 +164,13 @@ def ubus_init():
                 'method': switch_relay_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING
+                }
+            },
+            'impuls_on_relay': {
+                'method': impuls_on_relay_callback,
+                'signature': {
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING,
+                    'time': ubus.BLOBMSG_TYPE_STRING
                 }
             }
         }
