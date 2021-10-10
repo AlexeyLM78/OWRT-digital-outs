@@ -4,6 +4,7 @@ import sys
 from owrt_snmp_protocol import snmp_protocol
 from threading import Thread, Lock
 import time
+from journal import journal
 
 try:
     import ubus
@@ -26,6 +27,8 @@ def ubus_init():
             relay_dict = curr_relays[sect]
         except KeyError:
             # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "get_state_callback() id_relay " + sect + " not found")
             ret_val["state"] = '-1'
             ret_val["status"] = '-2'
         else:
@@ -47,11 +50,14 @@ def ubus_init():
     def on_relay_callback(event, data):
         ret_val = {}
         sect = data['id_relay']
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "ubus call on_relay " + sect)
         lock_curr_relays.acquire()
         try:
             relay_dict = curr_relays[sect]
         except KeyError:
             # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "on_relay_callback() id_relay " + sect + " not found")
             ret_val["result"] = '-2'
             lock_curr_relays.release()
         else:
@@ -66,11 +72,14 @@ def ubus_init():
     def off_relay_callback(event, data):
         ret_val = {}
         sect = data['id_relay']
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "ubus call off_relay " + sect)
         lock_curr_relays.acquire()
         try:
             relay_dict = curr_relays[sect]
         except KeyError:
             # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "off_relay_callback() id_relay " + sect + " not found")
             ret_val["result"] = '-2'
             lock_curr_relays.release()
         else:
@@ -85,11 +94,14 @@ def ubus_init():
     def switch_relay_callback(event, data):
         ret_val = {}
         sect = data['id_relay']
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "ubus call switch_relay " + sect)
         lock_curr_relays.acquire()
         try:
             relay_dict = curr_relays[sect]
         except KeyError:
             # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "switch_relay_callback() id_relay " + sect + " not found")
             ret_val["result"] = '-2'
             lock_curr_relays.release()
             event.reply(ret_val)
@@ -100,6 +112,8 @@ def ubus_init():
         try:
             cur_state = tmp_cnfg_relay['state']
         except KeyError:
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "switch_relay_callback() id_relay " + sect + " no value state")
             ret_val["result"] = '-1'
             event.reply(ret_val)
 
@@ -119,11 +133,15 @@ def ubus_init():
         ret_val = {}
         sect = data['id_relay']
         pause = data['time']
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                         "ubus call impuls_on_relay " + sect + " on " + pause + " sec")
         lock_curr_relays.acquire()
         try:
             relay_dict = curr_relays[sect]
         except KeyError:
             # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "impuls_on_relay_callback() id_relay " + sect + " not found")
             ret_val["result"] = '-2'
             lock_curr_relays.release()
         else:
@@ -144,11 +162,15 @@ def ubus_init():
         ret_val = {}
         sect = data['id_relay']
         pause = data['time']
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                         "ubus call impuls_off_relay " + sect + " on " + pause + " sec")
         lock_curr_relays.acquire()
         try:
             relay_dict = curr_relays[sect]
         except KeyError:
             # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "impuls_off_relay_callback() id_relay " + sect + " not found")
             ret_val["result"] = '-2'
             lock_curr_relays.release()
         else:
@@ -229,6 +251,8 @@ def parseconfig():
     try:
         confvalues = ubus.call("uci", "get", {"config": uci_config_snmp})
     except RuntimeError:
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                         "parseconfig() error get " + uci_config_snmp)
         sys.exit(-1)
 
     for confdict in list(confvalues[0]['values'].values()):
@@ -236,6 +260,8 @@ def parseconfig():
             if confdict['.name'] != "relay_prototype_snmp":
                 if confdict['proto'] == "SNMP":
                     if not check_param_relay(confdict):
+                        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                         "parseconfig() error parameters " + confdict['id_relay'])
                         continue
 
                     confdict['status'] = '-1'
@@ -263,7 +289,8 @@ def reparseconfig(event, data):
         try:
             conf_proto = ubus.call("uci", "get", {"config": uci_config_snmp})
         except RuntimeError:
-            print("RuntimeError: uci get {0}".format(uci_config_snmp))
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "reparseconfig() error get " + uci_config_snmp)
             fl_run_main = False
             return
 
@@ -286,6 +313,8 @@ def reparseconfig(event, data):
                             # Edit relay
                             if diff_param_poll_snmp(config, protodict):
                                 snmp_pr.stop_snmp_poll(config['id_task'])
+                                journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                                                 "Edit relay: stop polling relay " + config['id_task'])
                                 del curr_relays[config['id_relay']]
 
                                 if check_param_relay(protodict):
@@ -325,8 +354,12 @@ def reparseconfig(event, data):
                 try:
                     config = curr_relays.pop(relay)
                     snmp_pr.stop_snmp_poll(config['id_task'])
+                    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                                     "Deleting relay: stop polling relay " + config['id_task'])
                 except KeyError:
                     lock_curr_relays.release()
+                    journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                     "reparseconfig(): Deleting relay:  not found " + relay)
                     continue
                 else:
                     lock_curr_relays.release()
@@ -350,6 +383,7 @@ def run_poll_relay(relay):
     config_relay['id_task'] = id_poll
     tmp_cnfg_relay = config_relay.copy()
     lock_curr_relays.release()
+    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "start polling relay " + relay)
 
     if tmp_cnfg_relay['start_state'] != 'NO':
         id_set = snmp_pr.set_snmp_value(tmp_cnfg_relay['address'], tmp_cnfg_relay['community'], tmp_cnfg_relay['oid'],
@@ -381,20 +415,21 @@ def poll_state_changed(relay):
         # Checking change state
         if state != old_state:
             ubus.send("signal", {"event": "statechanged", "id": id_relay, "state": state})
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                             "state changed relay " + relay + " set to " + state)
 
-    try:
-        config_relay['state'] = state
-        config_relay['status'] = status
-    except KeyError:
-        pass
+    config_relay['state'] = state
+    config_relay['status'] = status
 
     lock_curr_relays.release()
 
 
 if __name__ == '__main__':
     if not ubus.connect("/var/run/ubus.sock"):
-        sys.stderr.write('Failed connect to ubus\n')
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "err", "Failed connect to ubus")
         sys.exit(-1)
+
+    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "Start module!")
 
     ubus_init()
     parseconfig()
@@ -418,7 +453,7 @@ if __name__ == '__main__':
                 poll_state_changed(relay)
                 ubus.loop(1)
     except KeyboardInterrupt:
-        print("__main__ === KeyboardInterrupt")
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "Finish module!")
     finally:
         if not lock_curr_relays.locked():
             lock_curr_relays.acquire()
@@ -427,6 +462,7 @@ if __name__ == '__main__':
             try:
                 config = curr_relays.pop(relay)
                 snmp_pr.stop_snmp_poll(config['id_task'])
+                journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "stop polling relay " + relay)
             except KeyError:
                 continue
         lock_curr_relays.release()
