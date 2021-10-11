@@ -1,5 +1,5 @@
 
-config globals 'globals'
+config relay 'globals'
 	option default_memo 'Relay'
 	option default_start_state 'NO'
 	list default_state '0.Выключено'
@@ -10,8 +10,7 @@ config globals 'globals'
 	option default_timeout '5'
 	option default_period '1'
 
-config relay 'relay_prototype_snmp'
-	option id_relay '0'
+config relay 'id_relay'
 	option memo 'Relay'
 	option start_state 'NO'
 	option state_alias_0 'Выключено'
