@@ -16,5 +16,5 @@ def main():
 
     ubus.send("commit", {"config": "owrt_digital_outs"})
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
