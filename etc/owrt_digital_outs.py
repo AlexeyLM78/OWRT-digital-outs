@@ -356,10 +356,14 @@ def parseconfig():
 
     for confdict in list(confvalues[0]['values'].values()):
         if confdict['.type'] == "info":
+            if not check_param_basic(confdict):
+                journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                 "parseconfig() error parameters basic " + confdict['.name'])
+                continue
             if confdict['proto'] == "SNMP":
-                if not check_param_relay(confdict):
+                if not check_param_snmp(confdict):
                     journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                                     "parseconfig() error parameters " + confdict['.name'])
+                                     "parseconfig() error parameters SNMP " + confdict['.name'])
                     continue
 
                 confdict['status'] = '-1'
@@ -367,6 +371,19 @@ def parseconfig():
                 lock_curr_relays.acquire()
                 curr_relays[confdict['.name']] = confdict
                 lock_curr_relays.release()
+
+
+def diff_param_relay(config, protodict):
+    # since polling relay in run, start_state parameter not checked,
+    # but will be taken into account when changing other parameters
+
+    try:
+        if config['proto'] == protodict['proto']:
+            return False
+        else:
+            return True
+    except KeyError:
+        return True
 
 
 def diff_param_poll_snmp(config, protodict):
@@ -381,6 +398,109 @@ def diff_param_poll_snmp(config, protodict):
         return True
 
 
+def check_add_relay(conf_proto):
+    for protodict in list(conf_proto[0]['values'].values()):
+        if protodict['.type'] == "info":
+            config = curr_relays.get(protodict['.name'])
+            if config is None:
+                # Add new relay
+                if not check_param_basic(protodict):
+                    journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                     "check_add_relay() error parameters basic " + protodict['.name'])
+                    continue
+
+                if protodict['proto'] == "SNMP":
+                    if not check_param_snmp(protodict):
+                        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                         "check_add_relay() error parameters SNMP " + protodict['.name'])
+                        continue
+
+                    lock_curr_relays.acquire()
+                    protodict['status'] = '-1'
+                    protodict['state'] = '-1'
+                    curr_relays[protodict['.name']] = protodict
+                    lock_curr_relays.release()
+
+                    # Run polling thread on SNMP
+                    thrd = Thread(target=run_poll_relay, args=(protodict['.name'], ))
+                    thrd.start()
+
+
+def check_edit_relay(conf_proto):
+    for protodict in list(conf_proto[0]['values'].values()):
+        if protodict['.type'] == "info":
+            config = curr_relays.get(protodict['.name'])
+            if config is not None:
+                lock_curr_relays.acquire()
+                if not diff_param_relay(config, protodict):
+                    if protodict['proto'] == "SNMP":
+                        if not diff_param_poll_snmp(config, protodict):
+                            lock_curr_relays.release()
+                            continue
+                    else:
+                        lock_curr_relays.release()
+                        continue
+
+                # Edit relay
+                if config['proto'] == "SNMP":
+                    snmp_pr.stop_snmp_poll(config['id_task'])
+                    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                                     "Edit relay: stop polling relay " + config['.name'])
+                    del curr_relays[config['.name']]
+
+                if not check_param_basic(protodict):
+                    lock_curr_relays.release()
+                    journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                     "check_edit_relay() error parameters basic " + protodict['.name'])
+                    continue
+
+                if protodict['proto'] == "SNMP":
+                    if not check_param_snmp(protodict):
+                        lock_curr_relays.release()
+                        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                         "check_edit_relay() error parameters SNMP " + protodict['.name'])
+                        continue
+
+                    protodict['status'] = '-1'
+                    protodict['state'] = '-1'
+                    curr_relays[protodict['.name']] = protodict
+                    lock_curr_relays.release()
+
+                    # Run polling thread on SNMP
+                    thrd = Thread(target=run_poll_relay, args=(protodict['.name'], ))
+                    thrd.start()
+                else:
+                    lock_curr_relays.release()
+
+
+def check_del_relay(conf_proto):
+    lock_curr_relays.acquire()
+    relays = list(curr_relays.keys())
+    for relay in relays:
+        relay_exists = False
+        for protodict in list(conf_proto[0]['values'].values()):
+            if protodict['.type'] == "info":
+                try:
+                    if protodict['.name'] == relay:
+                        relay_exists = True
+                        break
+                except KeyError:
+                    pass
+
+        if relay_exists == False:
+            try:
+                # Deleting relay
+                config = curr_relays.pop(relay)
+                snmp_pr.stop_snmp_poll(config['id_task'])
+                journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
+                                 "Deleting relay: stop polling relay " + config['.name'])
+            except KeyError:
+                journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                                 "reparseconfig(): Deleting relay:  not found " + relay)
+                continue
+    lock_curr_relays.release()
+
+
 def reparseconfig(event, data):
     global fl_run_main
     if data['config'] == uci_config_digital:
@@ -392,73 +512,9 @@ def reparseconfig(event, data):
             fl_run_main = False
             return
 
-        # Add & edit relay
-        for protodict in list(conf_proto[0]['values'].values()):
-            if protodict['.type'] == "info":
-                if protodict['proto'] == "SNMP":
-
-                    lock_curr_relays.acquire()
-                    config = curr_relays.get(protodict['.name'])
-                    if config is None:
-                        # Add new relay
-                        protodict['status'] = '-1'
-                        protodict['state'] = '-1'
-                        curr_relays[protodict['.name']] = protodict
-                        lock_curr_relays.release()
-
-                    else:
-                        # Edit relay
-                        if diff_param_poll_snmp(config, protodict):
-                            snmp_pr.stop_snmp_poll(config['id_task'])
-                            journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
-                                             "Edit relay: stop polling relay " + config['.name'])
-                            del curr_relays[config['.name']]
-
-                            if check_param_relay(protodict):
-                                protodict['status'] = '-1'
-                                protodict['state'] = '-1'
-                                curr_relays[protodict['.name']] = protodict
-
-                            lock_curr_relays.release()
-
-                        else:
-                            lock_curr_relays.release()
-                            continue
-
-                    # Run polling thread on SNMP
-                    thrd = Thread(target=run_poll_relay, args=(protodict['.name'], ))
-                    thrd.start()
-
-        # Deleting relay
-        lock_curr_relays.acquire()
-        relays = list(curr_relays.keys())
-        lock_curr_relays.release()
-        for relay in relays:
-            relay_exists = False
-            for protodict in list(conf_proto[0]['values'].values()):
-                if protodict['.type'] == "info":
-                    if protodict['proto'] == "SNMP":
-                        try:
-                            if protodict['.name'] == relay:
-                                relay_exists = True
-                                break
-                        except KeyError:
-                            pass
-
-            if relay_exists == False:
-                lock_curr_relays.acquire()
-                try:
-                    config = curr_relays.pop(relay)
-                    snmp_pr.stop_snmp_poll(config['id_task'])
-                    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice",
-                                     "Deleting relay: stop polling relay " + config['.name'])
-                except KeyError:
-                    lock_curr_relays.release()
-                    journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                                     "reparseconfig(): Deleting relay:  not found " + relay)
-                    continue
-                else:
-                    lock_curr_relays.release()
+        check_add_relay(conf_proto)
+        check_edit_relay(conf_proto)
+        check_del_relay(conf_proto)
 
 
 def run_poll_relay(relay):
@@ -469,25 +525,23 @@ def run_poll_relay(relay):
         lock_curr_relays.release()
         return
 
-    if not check_param_relay(config_relay):
-        del curr_relays[relay]
+    if config_relay['proto'] == "SNMP":
+        id_poll = snmp_pr.start_snmp_poll(config_relay['address'], config_relay['community'], config_relay['oid'],
+                                          config_relay['port'], config_relay['timeout'], config_relay['period'])
+        config_relay['id_task'] = id_poll
+        tmp_cnfg_relay = config_relay.copy()
         lock_curr_relays.release()
-        return
+        journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "start polling relay " + relay)
 
-    id_poll = snmp_pr.start_snmp_poll(config_relay['address'], config_relay['community'], config_relay['oid'],
-                                      config_relay['port'], config_relay['timeout'], config_relay['period'])
-    config_relay['id_task'] = id_poll
-    tmp_cnfg_relay = config_relay.copy()
-    lock_curr_relays.release()
-    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "start polling relay " + relay)
-
-    if tmp_cnfg_relay['start_state'] != 'NO':
-        id_set = snmp_pr.set_snmp_value(tmp_cnfg_relay['address'], tmp_cnfg_relay['community'], tmp_cnfg_relay['oid'],
-                                        tmp_cnfg_relay['port'], tmp_cnfg_relay['timeout'], tmp_cnfg_relay['start_state'])
-        res_set = "-1"
-        while res_set == "-1":
-            res_set = snmp_pr.res_set_snmp_value(id_set)
-        # TODO: handling error set_snmp_value()
+        if tmp_cnfg_relay['start_state'] != 'NO':
+            id_set = snmp_pr.set_snmp_value(tmp_cnfg_relay['address'], tmp_cnfg_relay['community'], tmp_cnfg_relay['oid'],
+                                            tmp_cnfg_relay['port'], tmp_cnfg_relay['timeout'], tmp_cnfg_relay['start_state'])
+            res_set = "-1"
+            while res_set == "-1":
+                res_set = snmp_pr.res_set_snmp_value(id_set)
+            # TODO: handling error set_snmp_value()
+    else:
+        lock_curr_relays.release()
 
 
 def poll_state_changed(relay):
