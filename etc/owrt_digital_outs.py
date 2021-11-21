@@ -15,7 +15,7 @@ except ImportError:
 fl_run_main = True
 curr_relays = {}
 snmp_pr = snmp_protocol()
-uci_config_snmp = "owrt_digital_outs"
+uci_config_digital = "owrt_digital_outs"
 lock_curr_relays = Lock()
 
 def ubus_init():
@@ -249,10 +249,10 @@ def parseconfig():
     curr_relays.clear()
     lock_curr_relays.release()
     try:
-        confvalues = ubus.call("uci", "get", {"config": uci_config_snmp})
+        confvalues = ubus.call("uci", "get", {"config": uci_config_digital})
     except RuntimeError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "parseconfig() error get " + uci_config_snmp)
+                         "parseconfig() error get " + uci_config_digital)
         sys.exit(-1)
 
     for confdict in list(confvalues[0]['values'].values()):
@@ -284,12 +284,12 @@ def diff_param_poll_snmp(config, protodict):
 
 def reparseconfig(event, data):
     global fl_run_main
-    if data['config'] == uci_config_snmp:
+    if data['config'] == uci_config_digital:
         try:
-            conf_proto = ubus.call("uci", "get", {"config": uci_config_snmp})
+            conf_proto = ubus.call("uci", "get", {"config": uci_config_digital})
         except RuntimeError:
             journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                             "reparseconfig() error get " + uci_config_snmp)
+                             "reparseconfig() error get " + uci_config_digital)
             fl_run_main = False
             return
 
