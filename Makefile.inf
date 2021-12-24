@@ -1,9 +1,9 @@
 SECTION="NetPing modules"
 CATEGORY="Base"
-TITLE="EPIC7 OWRT_Digital_outs"
+TITLE="OWRT-digital-outs"
 
 PKG_NAME="OWRT_Digital_outs"
-PKG_VERSION="Epic7.V1.S1"
+PKG_VERSION="0.1"
 PKG_RELEASE=1
 
 CONF_FILES=owrt_digital_outs
