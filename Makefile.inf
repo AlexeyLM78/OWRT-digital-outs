@@ -2,7 +2,7 @@ SECTION="NetPing modules"
 CATEGORY="Base"
 TITLE="OWRT-digital-outs"
 
-PKG_NAME="OWRT_Digital_outs"
+PKG_NAME="OWRT-digital-outs"
 PKG_VERSION="0.1"
 PKG_RELEASE=1
 
