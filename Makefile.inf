@@ -4,7 +4,8 @@ TITLE="OWRT-digital-outs"
 
 PKG_NAME="OWRT-digital-outs"
 PKG_VERSION="0.2"
-PKG_RELEASE=4
+PKG_RELEASE=5
+PKG_DEPENDS=OWRT-log OWRT-snmp-protocol ubus-0.1.1
 
 CONF_FILES=owrt-digital-outs
 CONF_DIR=/etc/config/
@@ -16,16 +17,36 @@ CLI_COMMANDS_DIR=commands
 CLI_HELP_FILE=Help
 CLI_CONFIGNAME=Configname
 
+INSTALL_DIR=
+
 .PHONY: all install
 
-all: install
+all: build preinstall install configure
+
+ipk: build install
+
+build:
+	@echo "Nothing to do"
+
+preinstall:
+	@echo "Nothing to do"
+
+configure:
+	@echo "Nothing to do"
 
 install:
-	for f in $(CONF_FILES); do cp $${f} $(CONF_DIR); done
-	mkdir $(ETC_FILES_DIR)
-	for f in $(ETC_FILES); do cp etc/$${f} $(ETC_FILES_DIR); done
-	cp -r $(CLI_COMMANDS_DIR) $(CLI_HELP_FILE) $(CLI_CONFIGNAME) $(ETC_FILES_DIR)
+ifneq ($(INSTALL_DIR),)
+	mkdir -p $(INSTALL_DIR)$(CONF_DIR)
+endif
+	for f in $(CONF_FILES); do cp $${f} $(INSTALL_DIR)$(CONF_DIR); done
+	mkdir -p $(INSTALL_DIR)$(ETC_FILES_DIR)
+	for f in $(ETC_FILES); do cp etc/$${f} $(INSTALL_DIR)$(ETC_FILES_DIR); done
+	cp -r $(CLI_COMMANDS_DIR) $(CLI_HELP_FILE) $(CLI_CONFIGNAME) $(INSTALL_DIR)$(ETC_FILES_DIR)
 
 clean:
+ifeq ($(INSTALL_DIR),)
 	for f in $(CONF_FILES); do rm -f $(CONF_DIR)$${f}; done
 	rm -rf $(ETC_FILES_DIR)
+else
+	rm -rf $(INSTALL_DIR)
+endif
