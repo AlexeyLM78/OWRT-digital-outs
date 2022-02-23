@@ -1,26 +1,10 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 from owrt_snmp_protocol import snmp_protocol
 from threading import Thread, Lock
 import time
 from journal import journal
-
-# Checking that there is no warning
-# UserWarning: Can not find any timezone configuration, defaulting to UTC.
-try:
-    if os.environ['TZ']:
-        pass
-except KeyError:
-    os.environ['TZ'] = 'Europe/Moscow'
-finally:
-    import ebnf.ebnf_start_state
-    import ebnf.ebnf_proto
-    import ebnf.ebnf_ip_addr
-    import ebnf.ebnf_port
-    import ebnf.ebnf_oid
-    import ebnf.ebnf_secmilisec
 
 try:
     import ubus
@@ -251,25 +235,17 @@ def check_param_basic(param):
     res = True
 
     try:
-        ebnf.ebnf_start_state.parse(param['start_state'])
+        start_state = param['start_state']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_basic() id_relay: " + param['.name'] + " not found 'start_state'")
         res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_basic() id_relay: " + param['.name'] + " EBNF check ERROR start_state: " + param['start_state'])
-        res = False
 
     try:
-        ebnf.ebnf_proto.parse(param['proto'])
+        proto = param['proto']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_basic() id_relay: " + param['.name'] + " not found 'proto'")
-        res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_basic() id_relay: " + param['.name'] + " EBNF check ERROR proto: " + param['proto'])
         res = False
 
     return res
@@ -286,58 +262,38 @@ def check_param_snmp(param):
         res = False
 
     try:
-        ebnf.ebnf_ip_addr.parse(param['address'])
+        address = param['address']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_snmp() id_relay: " + param['.name'] + " not found 'address'")
         res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_snmp() id_relay: " + param['.name'] + " EBNF check ERROR address: " + param['address'])
-        res = False
 
     try:
-        ebnf.ebnf_port.parse(param['port'])
+        port = param['port']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_snmp() id_relay: " + param['.name'] + " not found 'port'")
         res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_snmp() id_relay: " + param['.name'] + " EBNF check ERROR port: " + param['port'])
-        res = False
 
     try:
-        ebnf.ebnf_oid.parse(param['oid'])
+        oid = param['oid']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_snmp() id_relay: " + param['.name'] + " not found 'oid'")
         res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_snmp() id_relay: " + param['.name'] + " EBNF check ERROR oid: " + param['oid'])
-        res = False
 
     try:
-        ebnf.ebnf_secmilisec.parse(param['period'])
+        period = param['period']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_snmp() id_relay: " + param['.name'] + " not found 'period'")
         res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_snmp() id_relay: " + param['.name'] + " EBNF check ERROR period: " + param['period'])
-        res = False
 
     try:
-        ebnf.ebnf_secmilisec.parse(param['timeout'])
+        timeout = param['timeout']
     except KeyError:
         journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
                          "check_param_snmp() id_relay: " + param['.name'] + " not found 'timeout'")
-        res = False
-    except:
-        journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
-                         "check_param_snmp() id_relay: " + param['.name'] + " EBNF check ERROR timeout: " + param['timeout'])
         res = False
 
     return res
