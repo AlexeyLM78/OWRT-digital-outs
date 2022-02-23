@@ -3,13 +3,13 @@ CATEGORY="Base"
 TITLE="OWRT-digital-outs"
 
 PKG_NAME="OWRT-digital-outs"
-PKG_VERSION="0.1"
+PKG_VERSION="0.2"
 PKG_RELEASE=1
 
-CONF_FILES=owrt_digital_outs
+CONF_FILES=owrt-digital-outs
 CONF_DIR=/etc/config/
 
-ETC_FILES=owrt_digital_outs.py
+ETC_FILES=owrt-digital-outs.py
 ETC_FILES_DIR=/etc/netping_digital_outs/
 
 CLI_COMMANDS_DIR=commands

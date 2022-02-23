@@ -31,7 +31,7 @@ except ImportError:
 fl_run_main = True
 curr_relays = {}
 snmp_pr = snmp_protocol()
-uci_config_digital = "owrt_digital_outs"
+uci_config_digital = "owrt-digital-outs"
 lock_curr_relays = Lock()
 
 def ubus_init():
@@ -204,7 +204,7 @@ def ubus_init():
             event.reply(ret_val)
 
     ubus.add(
-        'owrt_digital_outs', {
+        'owrt-digital-outs', {
             'get_state': {
                 'method': get_state_callback,
                 'signature': {
