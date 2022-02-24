@@ -4,7 +4,7 @@ TITLE="OWRT-digital-outs"
 
 PKG_NAME="OWRT-digital-outs"
 PKG_VERSION="0.2"
-PKG_RELEASE=8
+PKG_RELEASE=9
 PKG_DEPENDS=OWRT-log OWRT-snmp-protocol ubus-0.1.1
 
 CONF_FILES=owrt-digital-outs
@@ -16,6 +16,8 @@ ETC_FILES_DIR=/etc/netping/$(PKG_NAME)/
 CLI_COMMANDS_DIR=commands
 CLI_HELP_FILE=Help
 CLI_CONFIGNAME=Configname
+
+TESTS_SRC_DIR=Tests
 
 AUTORUN_FILES=owrt-digital-outs-autorun
 
@@ -46,6 +48,7 @@ endif
 	mkdir -p $(INSTALL_DIR)$(ETC_FILES_DIR)
 	for f in $(ETC_FILES); do cp etc/$${f} $(INSTALL_DIR)$(ETC_FILES_DIR); done
 	cp -r $(CLI_COMMANDS_DIR) $(CLI_HELP_FILE) $(CLI_CONFIGNAME) $(INSTALL_DIR)$(ETC_FILES_DIR)
+	cp -r $(TESTS_SRC_DIR) $(INSTALL_DIR)$(ETC_FILES_DIR)
 	for f in $(AUTORUN_FILES); do cp $${f} $(INSTALL_DIR)/etc/init.d; done
 	mv $(INSTALL_DIR)/etc/init.d/owrt-digital-outs-autorun $(INSTALL_DIR)/etc/init.d/owrt-digital-outs
 	ln -s ../init.d/owrt-digital-outs $(INSTALL_DIR)/etc/rc.d/S90OWRT-Digital-outs
