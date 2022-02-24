@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import signal
 from owrt_snmp_protocol import snmp_protocol
 from threading import Thread, Lock
 import time
@@ -17,6 +18,13 @@ curr_relays = {}
 snmp_pr = snmp_protocol()
 uci_config_digital = "owrt-digital-outs"
 lock_curr_relays = Lock()
+
+def stop_run(signum, frame):
+    global fl_run_main
+    journal.WriteLog("OWRT_Digital_outs", "Normal", "notice", "Received termination signal!")
+    fl_run_main = False
+
+signal.signal(signal.SIGTERM, stop_run)
 
 def ubus_init():
     def get_state_callback(event, data):
