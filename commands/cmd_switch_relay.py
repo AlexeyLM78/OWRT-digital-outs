@@ -15,7 +15,7 @@ def main(relay):
         print("Failed connect to ubus")
         sys.exit(-1)
 
-    print(ubus.call("owrt-digital-outs", "switch_relay", {"id_relay":relay}))
+    print(ubus.call("owrt-digital-outs", "switch_relay", {"id_relay":relay, "ubus_rpc_session":"String"}))
 
 if __name__ == "__main__":
     main()
