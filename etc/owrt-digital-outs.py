@@ -200,39 +200,45 @@ def ubus_init():
             'get_state': {
                 'method': get_state_callback,
                 'signature': {
-                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             },
             'on_relay': {
                 'method': on_relay_callback,
                 'signature': {
-                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             },
             'off_relay': {
                 'method': off_relay_callback,
                 'signature': {
-                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             },
             'switch_relay': {
                 'method': switch_relay_callback,
                 'signature': {
-                    'id_relay': ubus.BLOBMSG_TYPE_STRING
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             },
             'impuls_on_relay': {
                 'method': impuls_on_relay_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING,
-                    'time': ubus.BLOBMSG_TYPE_STRING
+                    'time': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             },
             'impuls_off_relay': {
                 'method': impuls_off_relay_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING,
-                    'time': ubus.BLOBMSG_TYPE_STRING
+                    'time': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             }
         }
