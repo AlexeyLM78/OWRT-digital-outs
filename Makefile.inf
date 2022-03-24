@@ -4,7 +4,7 @@ TITLE="OWRT-digital-outs"
 
 PKG_NAME="OWRT-digital-outs"
 PKG_VERSION="0.2"
-PKG_RELEASE=10
+PKG_RELEASE=11
 PKG_DEPENDS=OWRT-log OWRT-snmp-protocol ubus-0.1.1
 
 CONF_FILES=owrt-digital-outs

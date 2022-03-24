@@ -195,6 +195,32 @@ def ubus_init():
         finally:
             event.reply(ret_val)
 
+    def get_memo_callback(event, data):
+        ret_val = {}
+        sect = data['id_relay']
+        lock_curr_relays.acquire()
+        try:
+            relay_dict = curr_relays[sect]
+        except KeyError:
+            # poll relay with id_relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "get_memo_callback() id_relay " + sect + " not found")
+            ret_val["memo"] = ''
+            lock_curr_relays.release()
+            event.reply(ret_val)
+            return
+
+        try:
+            ret_val["memo"] = relay_dict['memo']
+        except KeyError:
+            # memo for poll relay not found
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "get_memo_callback() id_relay " + sect + " memo not found")
+            ret_val["memo"] = ''
+        finally:
+            lock_curr_relays.release()
+            event.reply(ret_val)
+
     ubus.add(
         'owrt-digital-outs', {
             'get_state': {
@@ -238,6 +264,13 @@ def ubus_init():
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING,
                     'time': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
+                }
+            },
+            'get_memo': {
+                'method': get_memo_callback,
+                'signature': {
+                    'id_relay': ubus.BLOBMSG_TYPE_STRING,
                     'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             }
@@ -348,6 +381,8 @@ def diff_param_relay(config, protodict):
     # but will be taken into account when changing other parameters
 
     try:
+        config['memo'] = protodict['memo']
+
         if config['proto'] == protodict['proto']:
             return False
         else:
