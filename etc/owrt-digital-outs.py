@@ -221,6 +221,48 @@ def ubus_init():
             lock_curr_relays.release()
             event.reply(ret_val)
 
+    def get_free_id_callback(event, data):
+        list_id = []
+        ret_val = {}
+
+        try:
+            confvalues = ubus.call("uci", "get", {"config": uci_config_digital})
+        except RuntimeError:
+            journal.WriteLog("OWRT_Digital_outs", "Normal", "err",
+                             "get_free_id_callback() error get " + uci_config_digital)
+            ret_val["free_id"] = ''
+            event.reply(ret_val)
+            return
+
+        for confdict in list(confvalues[0]['values'].values()):
+            if confdict['.type'] == "info":
+                try:
+                    id_r = int(confdict['.name'])
+                    if id_r == 0:
+                        continue
+                except:
+                    continue
+                list_id.append(id_r)
+
+        list_id.sort()
+        try:
+            list_id.index(1)
+        except ValueError:
+            ret_val["free_id"] = '1'
+            event.reply(ret_val)
+            return
+
+        next_id = 1
+        for curr_id in list_id:
+            if curr_id == next_id:
+                next_id += 1
+                continue
+            else:
+                break
+
+        ret_val["free_id"] = str(next_id)
+        event.reply(ret_val)
+
     ubus.add(
         'owrt-digital-outs', {
             'get_state': {
@@ -271,6 +313,12 @@ def ubus_init():
                 'method': get_memo_callback,
                 'signature': {
                     'id_relay': ubus.BLOBMSG_TYPE_STRING,
+                    'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
+                }
+            },
+            'get_free_id': {
+                'method': get_free_id_callback,
+                'signature': {
                     'ubus_rpc_session': ubus.BLOBMSG_TYPE_STRING
                 }
             }
