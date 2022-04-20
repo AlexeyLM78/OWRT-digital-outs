@@ -113,6 +113,7 @@ def ubus_init():
             ret_val["result"] = '-2'
             lock_curr_relays.release()
             event.reply(ret_val)
+            return
 
         tmp_cnfg_relay = relay_dict.copy()
         lock_curr_relays.release()
@@ -124,6 +125,7 @@ def ubus_init():
                              "switch_relay_callback() id_relay " + sect + " no value state")
             ret_val["result"] = '-1'
             event.reply(ret_val)
+            return
 
         if cur_state == '0':
             val = '1'
@@ -132,6 +134,7 @@ def ubus_init():
         else:
             ret_val["result"] = '-1'
             event.reply(ret_val)
+            return
 
         res_set = set_val_snmp(tmp_cnfg_relay, val)
         ret_val["result"] = res_set
